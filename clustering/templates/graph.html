@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+    <link href='https://fonts.googleapis.com/css?family=Pacifico' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Arimo' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Hind:300' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans+Condensed:300' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+<body style="background: #000;">
+    <h1>{{header}}</h1>
+
+    <a href="results" class="btn">Go back and cluster again</a>
+
+    <div id="chart" class="chart"></div>
+    <div id="chart_temp" class="chart"></div>
+    <div id="chart_hum" class="chart"></div>
+    <div id="chart_pressure" class="chart"></div>
+    <div>{{description_1}}</div>
+    <div>{{description_2}}</div>
+    <div><table class="table table-striped" id="metrics">
+        <tbody>
+        </tbody>
+    </table>
+
+    </div>
+
+<div>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script type="text/javascript">
+    var graphs = {{graphJSON_clusters | safe}};
+    Plotly.plot('chart',graphs,{});
+</script>
+</div>
+
+<div>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script type="text/javascript">
+    var graphs_0 = {{graphJSON_temperature | safe}};
+    Plotly.plot('chart_temp',graphs_0,{});
+</script>
+</div>
+
+<div>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script type="text/javascript">
+    var graphs_2 = {{graphJSON_hum | safe}};
+    Plotly.plot('chart_hum',graphs_2,{});
+</script>
+</div>
+
+<div>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script type="text/javascript">
+    var graphs_3 = {{graphJSON_pressure | safe}};
+    Plotly.plot('chart_pressure',graphs_3,{});
+</script>
+</div>
+
+<div>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+<script type="text/javascript" src="static/bootstrap.js"></script>
+<script type="text/javascript">
+var metric = {{metrics | safe}};
+$(document).ready(function(){
+        $.each(metric, function(i,item){
+                $('#metrics > tbody:last').append('<tr><td>'+item+'</td></tr>');
+        });
+});
+</script>
+</div>
+
+
+</body>
+</html>

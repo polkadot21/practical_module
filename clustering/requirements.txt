@@ -1,0 +1,8 @@
+flask
+numpy
+plotly
+matplotlib
+pandas
+tslearn
+statsmodels
+scipy
