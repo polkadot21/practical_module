@@ -48,16 +48,29 @@ def input_features(inputs):
     return temperature, humidity, pressure
 
 #define pathes
-def define_features(temperature = True, humidity = False, air_pressure = False):
+def define_features(temperature = True, humidity = False, air_pressure = False, real = True):
     pathes = []
-    if temperature == True:
-        pathes.append('data/10_temp_6days.pkl')
-        #pathes.append('data/temp_test.pkl')
-    if humidity == True:
-        pathes.append('data/10_humidity_6days.pkl')
-    if air_pressure == True:
-        pathes.append('data/10_pressure_6days.pkl')
-    #print(pathes)
+
+    if real:
+        if temperature == True:
+            pathes.append('data/10_temp_6days.pkl')
+            #pathes.append('data/temp_test.pkl')
+        if humidity == True:
+            pathes.append('data/10_humidity_6days.pkl')
+        if air_pressure == True:
+            pathes.append('data/10_pressure_6days.pkl')
+        #print(pathes)
+
+    else:
+        if temperature == True:
+            pathes.append('data/temp_test.pkl')
+            #pathes.append('data/temp_test.pkl')
+        if humidity == True:
+            pathes.append('data/humidity_test.pkl')
+        if air_pressure == True:
+            pathes.append('data/pressure_test.pkl')
+        #print(pathes)
+
     return pathes
 
 def load_weather_dataset(path):
@@ -78,7 +91,7 @@ def load_weather_dataset(path):
         '/Users/e.saurov/PycharmProjects/practical_module/practical_module/clustering/data/humidity_test.pkl')
     ds['pressure'].to_pickle(
         '/Users/e.saurov/PycharmProjects/practical_module/practical_module/clustering/data/pressure_test.pkl')
-    return
+    return print('the data were saved')
 
 pathes = define_features(temperature = True, humidity = True, air_pressure = True)
 
@@ -144,8 +157,8 @@ def get_test_mts(pathes, outlier = False, n_test_buckets = 3, n_clusters = 2, sc
             V_tensor.append(V_matrix_scaled)
         else:
             V_tensor.append(V_matrix)
-    #print(np.asarray(V_tensor).shape)
-    #print(V_tensor)
+    print(np.asarray(V_tensor).shape)
+    #V_tensor[0] = V_tensor[0].reshape(np.asarray(V_tensor).shape[1], np.asarray(V_tensor).shape[0])
     n_observations = V_tensor[0].shape[0]
     n_buckets = V_tensor[0].shape[1]
     length = len(pathes)
@@ -158,8 +171,13 @@ def get_test_mts(pathes, outlier = False, n_test_buckets = 3, n_clusters = 2, sc
         V_tensor = V_tensor[:, :, 0:n_test_buckets] #four buckets
     else:
         for number in range(1, n_test_buckets):
-            V_tensor = np.concatenate((V_tensor, V_tensor), axis = 2)
+            V_tensor = np.concatenate((V_tensor, V_tensor[:, :, 0].reshape(length, n_observations, 1)), axis = 2)
     n_buckets = V_tensor[0].shape[1]
+    if n_test_buckets != V_tensor.shape[2]:
+        print(V_tensor.shape[2])
+        raise ValueError('The synthetic data has incorrect dimension')
+    else:
+        pass
     print('Tensor was defined')
     print(V_tensor.shape)
     if outlier:
@@ -206,7 +224,7 @@ def build_distance_matrix(pathes, n_test_buckets = 3, Test = False, outlier = Fa
     tensor = tensor.reshape(n_features, n_buckets, n_observations)
 
     """buckets 1, 6, 9"""
-    short = True
+    short = False
     if short:
         tensor = np.concatenate((tensor[:, 1, :].reshape(n_features, 1, n_observations),
                                  tensor[:, 6, :].reshape(n_features, 1, n_observations),
@@ -249,7 +267,7 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
         #pass
 
 
-    distance_matrix = build_distance_matrix(pathes, n_buckets, Test, outlier)
+    distance_matrix = build_distance_matrix(pathes, n_test_buckets, Test, outlier)
     fig = ff.create_dendrogram(distance_matrix)
     fig.update_layout(width=2100,
                       height=700,
@@ -268,7 +286,7 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
                                   height=700,
                                   template=pio.templates['plotly_white'],
                                   title="Temperature")
-    if 'data/10_temp_6days.pkl' in pathes:
+    if 'data/10_temp_6days.pkl' or 'data/temp_test.pkl' in pathes:
         traces = []
         for bucket in range(0, n_buckets):
             trace = go.Scattergl(x=index,
@@ -278,9 +296,10 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
                                  showlegend=True
                                  )
             traces.append(trace)
-        fig_temperature.add_traces(traces[1]) #number 1, 6, 9 because they are easily devided into two clusters
-        fig_temperature.add_traces(traces[6])
-        fig_temperature.add_traces(traces[9])
+        fig_temperature.add_traces(traces)
+        #fig_temperature.add_traces(traces[1]) #number 1, 6, 9 because they are easily devided into two clusters
+        #fig_temperature.add_traces(traces[6])
+        #fig_temperature.add_traces(traces[9])
     else:
         pass
 
@@ -290,7 +309,9 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
                                height=700,
                                template=pio.templates['plotly_white'],
                                title="Humidity")
-    if 'data/10_humidity_6days.pkl' in pathes:
+
+    print(pathes)
+    if 'data/10_humidity_6days.pkl' in pathes or 'data/humidity_test.pkl' in pathes:
 
         traces_hum = []
         for bucket in range(0, n_buckets):
@@ -301,10 +322,10 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
                                  showlegend=True
                                  )
             traces_hum.append(trace)
-        #fig_humidity.add_traces(traces_hum)
-        fig_humidity.add_traces(traces_hum[1])  # number 1, 6, 9 because they are easily devided into two clusters
-        fig_humidity.add_traces(traces_hum[6])
-        fig_humidity.add_traces(traces_hum[9])
+        fig_humidity.add_traces(traces_hum)
+        #fig_humidity.add_traces(traces_hum[1])  # number 1, 6, 9 because they are easily devided into two clusters
+        #fig_humidity.add_traces(traces_hum[6])
+        #fig_humidity.add_traces(traces_hum[9])
     else:
         text = 'Fuck, fucke, ucfck, ufcek, fukce, FUCK, kcuf'
         print(text)
@@ -317,7 +338,7 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
                                height=700,
                                template=pio.templates['plotly_white'],
                                title="Air pressure")
-    if 'data/10_pressure_6days.pkl' in pathes:
+    if 'data/10_pressure_6days.pkl' in pathes or 'data/pressure_test.pkl' in pathes:
         traces_pressure = []
         for bucket in range(0, n_buckets):
             trace = go.Scattergl(x=index,
@@ -328,10 +349,10 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
                                  )
 
             traces_pressure.append(trace)
-        #fig_pressure.add_traces(traces_pressure)
-        fig_pressure.add_traces(traces_pressure[1])  # number 1, 6, 9 because they are easily devided into two clusters
-        fig_pressure.add_traces(traces_pressure[6])
-        fig_pressure.add_traces(traces_pressure[9])
+        fig_pressure.add_traces(traces_pressure)
+        #fig_pressure.add_traces(traces_pressure[1])  # number 1, 6, 9 because they are easily devided into two clusters
+        #fig_pressure.add_traces(traces_pressure[6])
+        #fig_pressure.add_traces(traces_pressure[9])
 
     else:
         text = 'Fuck, fucke, ucfck, ufcek, fukce, FUCK, kcuf'
@@ -376,5 +397,5 @@ if __name__ == '__main__':
     #flat_clustering(pathes, Test = True, outlier = False)
     #hierarchical_clustering(pathes, Test=True, outlier = False)
     #plot_temperature(pathes, outlier = False)
-    get_index(pathes)
-    #load_weather_dataset('/Users/e.saurov/PycharmProjects/practical_module/practical_module/clustering/data/weather_features.csv')
+    #get_index(pathes)
+    load_weather_dataset('/Users/e.saurov/PycharmProjects/practical_module/practical_module/clustering/data/weather_features.csv')

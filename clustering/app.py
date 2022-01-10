@@ -28,7 +28,7 @@ def cluster():
 
     temperature, humidity, air_pressure = input_features(inputs)
     # load raw data
-    pathes = define_features(temperature = temperature, humidity = humidity, air_pressure = air_pressure)
+    pathes = define_features(temperature = temperature, humidity = humidity, air_pressure = air_pressure, real = True)
 
     #create graph objects for JS
     graphJSON_clusters, graphJSON_temp, graphJSON_hum, graphJSON_pressure = create_json_obj(pathes, n_test_buckets = n_buckets, Test = False, outlier = False)
