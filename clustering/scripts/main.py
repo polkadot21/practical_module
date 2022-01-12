@@ -1,19 +1,21 @@
 import pandas as pd
 import statsmodels.api as sm
-from tslearn.preprocessing import TimeSeriesScalerMinMax
+from tslearn.preprocessing import TimeSeriesScalerMinMax, TimeSeriesScalerMeanVariance
 import pickle
 import numpy as np
 import time
 from tslearn.metrics import dtw
 from plotly import figure_factory as ff
 from scipy.spatial.distance import squareform
-from scipy.cluster.hierarchy import linkage, fcluster
+from scipy.cluster.hierarchy import linkage, fclusterdata
 from sklearn.metrics import rand_score
 import matplotlib.pyplot as plt
 import plotly.io as pio
 import plotly.graph_objects as go
 import json
 import plotly
+from scipy.cluster import hierarchy
+from scipy.spatial.distance import euclidean
 
 
 def timing(f):
@@ -27,6 +29,7 @@ def timing(f):
     return wrap
 
 def input_features(inputs):
+
     if 'temperature' in inputs:
         temperature = True
     else:
@@ -42,7 +45,7 @@ def input_features(inputs):
     else:
         pressure = False
 
-    if temperature == False & humidity == False & pressure == False:
+    if (temperature == False and humidity == False and pressure == False):
         raise ValueError("Non of the features were defined!")
 
     return temperature, humidity, pressure
@@ -93,7 +96,7 @@ def load_weather_dataset(path):
         '/Users/e.saurov/PycharmProjects/practical_module/practical_module/clustering/data/pressure_test.pkl')
     return print('the data were saved')
 
-pathes = define_features(temperature = True, humidity = True, air_pressure = True)
+pathes = define_features(temperature = False, humidity = False, air_pressure = True)
 
 def get_index(pathes):
     V_tensor = []
@@ -105,8 +108,8 @@ def get_index(pathes):
     return index
 
 #create V tensor
-def get_mts(pathes, n_test_buckets = 3, scale = True):
-    scaler = TimeSeriesScalerMinMax()
+def get_mts(pathes, n_test_buckets = 10, scale = True):
+    scaler = TimeSeriesScalerMeanVariance()
     V_tensor = []
     for path in pathes:
         V_matrix  = pickle.load(open(path, "rb"))
@@ -200,6 +203,30 @@ def get_test_mts(pathes, outlier = False, n_test_buckets = 3, n_clusters = 2, sc
 
     return V_tensor
 
+def p_to_altitude(p):
+    k = 44330
+    p0 = 101995
+    pot = (1 / 5.255)
+
+    altitude = k*(1 - (p/p0)**pot)
+    return round(altitude, 0)
+
+
+def altitudes_of_feature(pathes, n_test_buckets = 10, scale = False):
+
+    V_tensor = get_mts(pathes, n_test_buckets, scale)
+
+
+    altitudes = []
+    means = []
+    for bucket in range(0, n_test_buckets):
+        mean = np.mean(V_tensor[:, :, bucket])
+        means.append(mean)
+        altitude = p_to_altitude(mean)
+        altitudes.append(altitude)
+
+    return np.asarray(altitudes).reshape(10, 1)
+
 def plot_temperature(pathes, outlier = False):
     V_tensor = get_test_mts(pathes, outlier)
 
@@ -242,9 +269,9 @@ def build_distance_matrix(pathes, n_test_buckets = 3, Test = False, outlier = Fa
                 y = tensor[feature, :, j]
                 if i != j:
                     # dist, _ = fastdtw(x, y, dist=euclidean)
-                    dist = dtw(x, y)
+                    dist = euclidean(x, y)
                     distance_matrix[i, j] = dist + distance_matrix[i, j]
-
+    print(distance_matrix)
     return distance_matrix
 
 def condense_distance_matrix(pathes, n_test_buckets =3, Test = False, outlier = False):
@@ -253,11 +280,18 @@ def condense_distance_matrix(pathes, n_test_buckets =3, Test = False, outlier = 
     linkresult = linkage(condensed_distance_matrix)
     return linkresult
 
+def local_dendro(pathes):
+    altitudes = altitudes_of_feature(pathes, n_test_buckets = 10, scale = False)
+    Z = hierarchy.linkage(altitudes, 'single')
+    plt.figure()
+    dn = hierarchy.dendrogram(Z)
+    return plt.show()
+
 # cluster
 @timing
 def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier = False):
     if Test:
-        V_tensor = get_test_mts(pathes, outlier, n_test_buckets, scale = False)
+        V_tensor = get_test_mts(pathes, outlier, n_test_buckets, scale = True)
         n_buckets = n_test_buckets
         #n_buckets = len(V_tensor[0, 0, :])
     else:
@@ -266,9 +300,11 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
         #raise ValueError('The real data were taken')
         #pass
 
+    altitudes = altitudes_of_feature(pathes, n_test_buckets = 10, scale = False)
+
 
     distance_matrix = build_distance_matrix(pathes, n_test_buckets, Test, outlier)
-    fig = ff.create_dendrogram(distance_matrix)
+    fig = ff.create_dendrogram(altitudes, color_threshold=200)
     fig.update_layout(width=2100,
                       height=700,
                       template=pio.templates['plotly_white'],
@@ -286,7 +322,7 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
                                   height=700,
                                   template=pio.templates['plotly_white'],
                                   title="Temperature")
-    if 'data/10_temp_6days.pkl' or 'data/temp_test.pkl' in pathes:
+    if 'data/10_temp_6days.pkl' in pathes or 'data/temp_test.pkl' in pathes:
         traces = []
         for bucket in range(0, n_buckets):
             trace = go.Scattergl(x=index,
@@ -341,13 +377,28 @@ def create_fig_for_dendrogram(pathes, n_test_buckets = 3, Test = False, outlier 
     if 'data/10_pressure_6days.pkl' in pathes or 'data/pressure_test.pkl' in pathes:
         traces_pressure = []
         for bucket in range(0, n_buckets):
-            trace = go.Scattergl(x=index,
-                                 y=V_tensor[2, :, bucket],  # temperature
-                                 xaxis='x2',
-                                 yaxis='y2',
-                                 showlegend=True
-                                 )
+            if 'data/10_humidity_6days.pkl' in pathes or 'data/humidity_test.pkl' in pathes:
 
+                trace = go.Scattergl(x=index,
+                                     y=V_tensor[2, :, bucket],  # temperature
+                                     xaxis='x2',
+                                     yaxis='y2',
+                                     showlegend=True
+                                     )
+            elif 'data/10_temp_6days.pkl' in pathes or 'data/temp_test.pkl' in pathes:
+                trace = go.Scattergl(x=index,
+                                     y=V_tensor[1, :, bucket],  # temperature
+                                     xaxis='x2',
+                                     yaxis='y2',
+                                     showlegend=True
+                                     )
+            else:
+                trace = go.Scattergl(x=index,
+                                     y=V_tensor[0, :, bucket],  # temperature
+                                     xaxis='x2',
+                                     yaxis='y2',
+                                     showlegend=True
+                                     )
             traces_pressure.append(trace)
         fig_pressure.add_traces(traces_pressure)
         #fig_pressure.add_traces(traces_pressure[1])  # number 1, 6, 9 because they are easily devided into two clusters
@@ -377,9 +428,11 @@ def create_header_and_discription(n_buckets):
 
     return header, description_1, description_2
 
-def HAC_rand_score(pathes, n_test_buckets = 3, Test = False, outlier = False):
-    linkresult = condense_distance_matrix(pathes, n_test_buckets, Test, outlier)
-    labels = fcluster(linkresult, t = 2, criterion = 'distance')
+def HAC_rand_score(pathes, n_test_buckets = 10, Test = False, outlier = False):
+    #inkresult = condense_distance_matrix(pathes, n_test_buckets, Test, outlier)
+    linkresult = altitudes_of_feature(pathes)
+    print(linkresult)
+    labels = fclusterdata(linkresult, t = 3, criterion = 'maxclust', method = 'average')
     target = [1]
     for number in range(0, n_test_buckets-1): #add as many labels as the number of synthetic buckets
         target.append(0)
@@ -390,12 +443,11 @@ def HAC_rand_score(pathes, n_test_buckets = 3, Test = False, outlier = False):
     metric_string.append(rs)
     metric_string.append(str(labels))
     metric_string.append(str(target))
-    return metric_string
+    return print(labels)
 
 
 if __name__ == '__main__':
-    #flat_clustering(pathes, Test = True, outlier = False)
-    #hierarchical_clustering(pathes, Test=True, outlier = False)
-    #plot_temperature(pathes, outlier = False)
-    #get_index(pathes)
-    load_weather_dataset('/Users/e.saurov/PycharmProjects/practical_module/practical_module/clustering/data/weather_features.csv')
+    #altitudes_of_feature(pathes, scale=False)
+    #local_dendro(pathes)
+    HAC_rand_score(pathes)
+    #load_weather_dataset('/Users/e.saurov/PycharmProjects/practical_module/practical_module/clustering/data/weather_features.csv')
